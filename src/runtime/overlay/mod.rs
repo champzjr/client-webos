@@ -356,6 +356,7 @@ pub(super) enum ConfirmAction {
 const DIALOG_FRAME_STEP: Duration = Duration::from_millis(16);
 
 /// A two-button confirm dialog: a destructive action and Cancel, with an open/close fade.
+#[allow(dead_code)]
 pub(super) struct ConfirmDialog {
     title: &'static str,
     subtitle: &'static str,
@@ -373,6 +374,7 @@ pub(super) struct ConfirmDialog {
     layout: Option<dialog::Layout>,
 }
 
+#[allow(dead_code)]
 impl ConfirmDialog {
     pub(super) fn new(title: &'static str, subtitle: &'static str, label: &'static str) -> Self {
         Self {

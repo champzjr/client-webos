@@ -2,6 +2,8 @@
 //! the action and Cancel. [`layout`] is the geometry; the hit tests and [`draw`] both read it,
 //! so what is drawn is what is hit.
 
+#![allow(dead_code)]
+
 use std::time::{Duration, Instant};
 
 use pf_console_ui::icons::{by_name, draw_icon};
