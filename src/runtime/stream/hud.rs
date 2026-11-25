@@ -337,7 +337,19 @@ fn tv_extras(connected: &session::Connected, prev_cpu: &mut Option<(u64, Instant
             slack as f32 / 1000.0
         )));
     }
-    let mut out = vec![Extra::detail(ndl), Extra::detail(audio), Extra::detail(pacing)];
+    let mut out = Vec::with_capacity(5);
+    if backlog >= 0 {
+        let hz = f64::from(connected.client.mode().refresh_hz.max(1));
+        let buf_frames = if backlog > 0 { f64::from(backlog) } else { 0.5 };
+        let decode_ms = buf_frames * (1000.0 / hz);
+        out.push(Extra {
+            text: format!("decode {decode_ms:.1} ms (NDL buf {backlog})"),
+            tier: StatsVerbosity::Normal,
+            advanced_only: false,
+            role: Role::Primary,
+        });
+    }
+    out.extend([Extra::detail(ndl), Extra::detail(audio), Extra::detail(pacing)]);
     // The set's own headroom, in both vocabularies. CPU shows from the second sample on.
     if let Some((ticks, mem_bytes)) = crate::platform::webos::device::process_cpu_mem() {
         let cpu = prev_cpu.map(|(prev, at)| {
