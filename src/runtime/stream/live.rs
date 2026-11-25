@@ -328,7 +328,7 @@ impl Stream {
         }
         self.tick_pad_shortcuts(cx)?;
         self.tick_ring(cx)?;
-        self.tick_dialog_shortcuts(cx);
+        self.tick_dialog_shortcuts(cx)?;
         self.tick_remote_actions(cx, osk);
         self.sync_capture(cx, events);
         let dialog_shown = self.tick_dialog(cx)?;
@@ -519,9 +519,10 @@ impl Stream {
         match (action, phase) {
             (Action::Ring, _) => self.toggle_ring(cx),
             (Action::Slot(SlotId::EndStream), _) => {
-                if !self.disconnect.is_open() {
-                    self.disconnect.open(1, cx.fonts, cx.display);
-                }
+                tracing::info!("EndStream shortcut — disconnecting to menu");
+                self.client_initiated_disconnect = true;
+                cx.connected.disconnect_quit();
+                return ControlFlow::Break(StreamOutcome::ReturnToMenu);
             }
             (_, Phase::Down | Phase::Up) => hold_keys(cx.connected, cx.settings, pad, action, phase == Phase::Down),
             (_, Phase::Tap) => {
@@ -543,7 +544,7 @@ impl Stream {
 
     /// What opens the stop dialog from the remote — the EXIT gesture — and its hold on input,
     /// plus the remote's Home key. A pad opens it through [`Self::pad_shortcut`].
-    fn tick_dialog_shortcuts(&mut self, cx: &mut Cx<'_>) {
+    fn tick_dialog_shortcuts(&mut self, cx: &mut Cx<'_>) -> ControlFlow<StreamOutcome> {
         // An open dialog swallows pointer input from here on, so no release ever arrives for
         // whatever is down. Done here rather than at each `open` site so every path into the
         // dialog is covered; the pads are handed over on the dialog's edge below.
@@ -553,10 +554,12 @@ impl Stream {
             }
             self.buttons.release_held(|ev| cx.connected.send_input(ev));
         }
-        // EXIT gesture (held Back) opens the dialog; a short tap is Esc (`events`).
-        if exit_gesture_fired(&mut self.exit_held) && !self.disconnect.is_open() {
-            tracing::info!("EXIT gesture — opening disconnect dialog");
-            self.disconnect.open(1, cx.fonts, cx.display);
+        // EXIT gesture (held Back) ends the stream immediately without confirmation.
+        if exit_gesture_fired(&mut self.exit_held) {
+            tracing::info!("EXIT gesture — disconnecting to menu");
+            self.client_initiated_disconnect = true;
+            cx.connected.disconnect_quit();
+            return ControlFlow::Break(StreamOutcome::ReturnToMenu);
         }
         // The dialog owns input and the canvas, so the dial gives way to it.
         if self.disconnect.is_open() && self.ring.open() {
@@ -585,6 +588,7 @@ impl Stream {
         if home_key_fired(&mut self.home_held) {
             crate::platform::webos::luna::launch_home();
         }
+        ControlFlow::Continue(())
     }
 
     /// The colour keys' actions, latched by the event arm, and the connection-issue toast.
